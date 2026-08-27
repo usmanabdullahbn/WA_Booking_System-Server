@@ -73,26 +73,34 @@ async function handleMessage(userId, rawMessage, contact, source = 'whatsapp') {
     return { reply: `❌ Booking cancelled. Type *book* anytime to start again.` };
   }
 
+  // A greeting always (re)starts the conversation from the very first question,
+  // no matter what state the session was in. The web chatbot sends "hi" on load,
+  // so a page refresh reliably starts a fresh booking.
+  if (GREETINGS.includes(lower)) {
+    resetSession(userId);
+    const fresh = getSession(userId);
+    fresh.state = 'SERVICE';
+    return { reply: `${welcomeMessage()}\n\n${askService()}` };
+  }
+
   switch (session.state) {
     case 'IDLE': {
-      if (GREETINGS.includes(lower)) {
-        session.state = 'NAME';
-        return { reply: `${welcomeMessage()}\n\n${askName()}` };
-      }
-      return { reply: welcomeMessage() };
-    }
-
-    case 'NAME': {
-      if (!message) return { reply: `Please type your name.` };
-      session.data.name = message;
+      // Any first message starts the booking flow at the service question.
       session.state = 'SERVICE';
-      return { reply: askService() };
+      return { reply: `${welcomeMessage()}\n\n${askService()}` };
     }
 
     case 'SERVICE': {
       const service = resolveService(message);
       if (!service) return { reply: `Please pick a valid service.\n\n${serviceMenu()}` };
       session.data.service = service;
+      session.state = 'NAME';
+      return { reply: askName() };
+    }
+
+    case 'NAME': {
+      if (!message) return { reply: `Please type your name.` };
+      session.data.name = message;
       session.state = 'DATE';
       return { reply: askDate() };
     }
